@@ -16,6 +16,8 @@ read pfilipczakSU_PASS
 # setup root password
 echo "Enter new root password:"
 read ROOT_PASS
+
+NEW_SSH_PORT="6422"
 #------------------------------------- VARIABLES -------------------------------------
 
 #------------------------------------- USER and SSH ----------------------------------
@@ -47,6 +49,8 @@ sudo usermod -aG sudo pf.admin
 
 echo root:${ROOT_PASS} | /usr/sbin/chpasswd
 
+
+echo "Port 6422" >> /etc/ssh/sshd_config
 echo "AllowUsers  pfilipczak " >> /etc/ssh/sshd_config
 systemctl restart sshd
 systemctl restart ssh
@@ -59,7 +63,7 @@ sed -i 's/IPV6=yes/IPV6=no/' /etc/default/ufw
 ufw logging on
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow from X.X.X.X to any port 22 proto tcp
+ufw allow from X.X.X.X to any port 6422 proto tcp
 # ufw allow 80/tcp
 # ufw allow 443/tcp
 yes | ufw enable
