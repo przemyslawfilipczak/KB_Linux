@@ -1,0 +1,130 @@
+root@staging:/home/pf.admin# lsblk
+NAME                      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda                         8:0    0   64G  0 disk
+├─sda1                      8:1    0    1G  0 part /boot/efi
+├─sda2                      8:2    0    2G  0 part /boot
+└─sda3                      8:3    0 60.9G  0 part
+  └─ubuntu--vg-ubuntu--lv 252:0    0   60G  0 lvm  /
+sr0                        11:0    1 1024M  0 rom
+
+#### resize .vhdx to 70GB
+-- 
+root@staging:/home/pf.admin# lsblk
+NAME                      MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sda                         8:0    0   70G  0 disk 				<----NEW SIZE
+├─sda1                      8:1    0    1G  0 part /boot/efi
+├─sda2                      8:2    0    2G  0 part /boot
+└─sda3                      8:3    0 60.9G  0 part
+  └─ubuntu--vg-ubuntu--lv 252:0    0   60G  0 lvm  /
+sr0                        11:0    1 1024M  0 rom
+
+
+#### disk filling
+root@staging:/home/pf.admin# fallocate -l 49G /plik.img
+
+
+root@staging:/home/pf.admin# df -h
+Filesystem                         Size  Used Avail Use% Mounted on
+tmpfs                              383M  928K  382M   1% /run
+efivarfs                           128M   24K  128M   1% /sys/firmware/efi/efivars
+/dev/mapper/ubuntu--vg-ubuntu--lv   59G   55G  794M  99% /
+tmpfs                              1.9G     0  1.9G   0% /dev/shm
+tmpfs                              5.0M     0  5.0M   0% /run/lock
+/dev/sda2                          2.0G   96M  1.7G   6% /boot
+/dev/sda1                          1.1G  6.2M  1.1G   1% /boot/efi
+tmpfs                              383M   12K  383M   1% /run/user/1000
+
+
+#### Expanding partitions
+
+
+
+root@staging:/home/pf.admin# sudo parted /dev/sda
+GNU Parted 3.6
+Using /dev/sda
+Welcome to GNU Parted! Type 'help' to view a list of commands.
+(parted) print
+Model: Msft Virtual Disk (scsi)
+Disk /dev/sda: 75.2GB
+Sector size (logical/physical): 512B/4096B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size    File system  Name     Flags
+ 1      1049kB  1128MB  1127MB  fat32                 boot, esp
+ 2      1128MB  3276MB  2147MB  ext4
+ 3      3276MB  68.7GB  65.4GB               primary 
+
+(parted) resizepart 3 100%					///<------------------------------- EXPAND
+(parted) print
+Model: Msft Virtual Disk (scsi)
+Disk /dev/sda: 75.2GB
+Sector size (logical/physical): 512B/4096B
+Partition Table: gpt
+Disk Flags:
+
+Number  Start   End     Size    File system  Name     Flags
+ 1      1049kB  1128MB  1127MB  fat32                 boot, esp
+ 2      1128MB  3276MB  2147MB  ext4
+ 3      3276MB  75.2GB  71.9GB               primary <---------------New Size
+
+(parted) quit
+Information: You may need to update /etc/fstab.
+
+root@staging:/home/pf.admin# sudo pvdisplay
+  --- Physical volume ---
+  PV Name               /dev/sda3
+  VG Name               ubuntu-vg
+  PV Size               <60.95 GiB / not usable 2.98 MiB
+  Allocatable           yes (but full)
+  PE Size               4.00 MiB
+  Total PE              15602
+  Free PE               0
+  Allocated PE          15602
+  PV UUID               O6Bhb4-GycV-30SC-9pee-Eeyj-uXvZ-mrTh3p
+
+root@staging:/home/pf.admin# sudo pvresize /dev/sda3
+  Physical volume "/dev/sda3" changed
+  1 physical volume(s) resized or updated / 0 physical volume(s) not resized
+root@staging:/home/pf.admin# sudo vgdisplay
+  --- Volume group ---
+  VG Name               ubuntu-vg
+  System ID
+  Format                lvm2
+  Metadata Areas        1
+  Metadata Sequence No  8
+  VG Access             read/write
+  VG Status             resizable
+  MAX LV                0
+  Cur LV                1
+  Open LV               1
+  Max PV                0
+  Cur PV                1
+  Act PV                1
+  VG Size               <66.95 GiB
+  PE Size               4.00 MiB
+  Total PE              17138
+  Alloc PE / Size       15602 / <60.95 GiB
+  Free  PE / Size       1536 / 6.00 GiB 			////////<-----Space available
+  VG UUID               2nwnB3-Vgi8-PVzd-e7z3-jfii-qzep-A4cpAI
+
+root@staging:/home/pf.admin# sudo lvextend -l +100%FREE /dev/ubuntu-vg/ubuntu-lv
+  Size of logical volume ubuntu-vg/ubuntu-lv changed from <60.95 GiB (15602 extents) to <66.95 GiB (17138 extents).
+  Logical volume ubuntu-vg/ubuntu-lv successfully resized.
+  
+root@staging:/home/pf.admin# sudo resize2fs /dev/ubuntu-vg/ubuntu-lv
+resize2fs 1.47.0 (5-Feb-2023)
+Filesystem at /dev/ubuntu-vg/ubuntu-lv is mounted on /; on-line resizing required
+old_desc_blocks = 8, new_desc_blocks = 9
+The filesystem on /dev/ubuntu-vg/ubuntu-lv is now 17549312 (4k) blocks long.
+
+root@staging:/home/pf.admin# df -h
+Filesystem                         Size  Used Avail Use% Mounted on
+tmpfs                              383M  896K  382M   1% /run
+efivarfs                           128M   24K  128M   1% /sys/firmware/efi/efivars
+/dev/mapper/ubuntu--vg-ubuntu--lv   66G   55G  7.4G  89% /
+tmpfs                              1.9G     0  1.9G   0% /dev/shm
+tmpfs                              5.0M     0  5.0M   0% /run/lock
+/dev/sda2                          2.0G   96M  1.7G   6% /boot
+/dev/sda1                          1.1G  6.2M  1.1G   1% /boot/efi
+tmpfs                              383M   12K  383M   1% /run/user/1000
