@@ -1,0 +1,24 @@
+root@staging:# swapon --show
+NAME      TYPE SIZE USED PRIO
+/swap.img file 3.9G 1.2G   -2
+root@staging:# fallocate -l 16G /swap1.img
+root@staging:# chmod 600 /swap1.img
+root@staging:# mkswap /swap1.img
+Setting up swapspace version 1, size = 16 GiB (17179865088 bytes)
+no label, UUID=00000000-1111-2222-3333-444444444444
+root@staging:# swapon /swap1.img
+
+root@staging:# nano /etc/fstab
+...
+/swap1.img      none    swap    sw      0       0
+...
+
+root@staging:# swapon --show
+NAME       TYPE SIZE USED PRIO
+/swap.img  file 3.9G 1.2G   -2
+/swap1.img file  16G   0B   -3
+root@staging:# swapoff -v /swap.img
+swapoff /swap.img
+root@staging:# swapon --show
+NAME       TYPE SIZE  USED PRIO
+/swap1.img file  16G 41.4M   -2
